@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Shared Babylon.js Animation</title>
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+  <canvas id="renderCanvas" style="width:100%; height:100vh;"></canvas>
+  <script>
+    const canvas = document.getElementById("renderCanvas");
+    const engine = new BABYLON.Engine(canvas, true);
+    const socket = io(); // Connect to server
+
+    const createScene = () => {
+      const scene = new BABYLON.Scene(engine);
+      const camera = new BABYLON.ArcRotateCamera("camera", Math.PI / 2, Math.PI / 4, 5, BABYLON.Vector3.Zero(), scene);
+      camera.attachControl(canvas, true);
+      new BABYLON.HemisphericLight("light", new BABYLON.Vector3(1, 1, 0), scene);
+
+      const box = BABYLON.MeshBuilder.CreateBox("box", {}, scene);
+      const anim = new BABYLON.Animation("boxAnim", "rotation.y", 30, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
+      const keys = [
+        { frame: 0, value: 0 },
+        { frame: 30, value: Math.PI },
+        { frame: 60, value: 2 * Math.PI }
+      ];
+      anim.setKeys(keys);
+      box.animations.push(anim);
+
+      // Start animation and broadcast frame
+      scene.onBeforeRenderObservable.add(() => {
+        const frame = scene.getAnimationRatio() * engine.getDeltaTime();
+        socket.emit("frameUpdate", { frame });
+      });
+
+      socket.on("frameUpdate", data => {
+        box.rotation.y = data.frame % (2 * Math.PI);
+      });
+
+      return scene;
+    };
+
+    const scene = createScene();
+    engine.runRenderLoop(() => scene.render());
+    window.addEventListener("resize", () => engine.resize());
+  </script>
+</body>
+</html>
